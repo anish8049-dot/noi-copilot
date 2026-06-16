@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NOI Copilot — Asset Management Demo</title>
+  <meta name="description" content="Revenue leakage detection, variance commentary, and AR triage for multifamily asset management. Built by an asset-management analyst." />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <div class="brand">
+        <span class="logo">◆</span>
+        <div>
+          <div class="brand-name">NOI&nbsp;Copilot</div>
+          <div class="brand-tag">Asset-management automation · demo on synthetic data</div>
+        </div>
+      </div>
+      <div class="prop">
+        <div id="prop-name" class="prop-name">—</div>
+        <div id="prop-meta" class="prop-meta">—</div>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabs-wrap">
+    <div class="wrap tabs">
+      <button class="tab active" data-pane="estimator">🎯 Firm Estimator</button>
+      <button class="tab" data-pane="leakage">① Revenue Leakage Detector</button>
+      <button class="tab" data-pane="variance">② Variance / Board Package</button>
+      <button class="tab" data-pane="ar">③ AR / Delinquency Triage</button>
+    </div>
+  </nav>
+
+  <main class="wrap">
+
+    <!-- =================== FIRM ESTIMATOR =================== -->
+    <section id="pane-estimator" class="pane active">
+      <div class="pane-head">
+        <h2>Firm Leakage Estimator</h2>
+        <p>Size the likely uncaptured ancillary revenue for any portfolio <em>before</em> you ever see their data — from market and asset-class benchmarks. Walk into the meeting already holding their number. Every assumption is shown and adjustable, so it survives a CFO poking at it.</p>
+      </div>
+      <div class="grid-2">
+        <div class="card est-form">
+          <h3>Target portfolio</h3>
+          <label>Firm / portfolio name <input id="est-name" type="text" placeholder="e.g., Acme Residential" /></label>
+          <label>Total units <input id="est-units" type="number" value="300" min="1" step="10" /></label>
+          <label>Asset class <select id="est-class"></select></label>
+          <label>Market <select id="est-market"></select></label>
+          <label class="rangerow">Ancillary program maturity — <strong id="est-mat-val">Developing</strong>
+            <input id="est-maturity" type="range" min="0" max="100" value="50" /></label>
+          <p class="muted small">Drag toward “best-in-class” to show how a well-run program shrinks the gap. This is a benchmark estimate to validate against actuals — not a promise.</p>
+        </div>
+        <div class="card">
+          <div id="est-headline"></div>
+          <h3 class="mt">Where the gap sits</h3>
+          <div id="est-bars" class="cats"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Estimate detail &amp; assumptions <span class="muted">(challenge any line)</span></h3>
+        <div class="tablescroll"><table id="est-table" class="data"></table></div>
+      </div>
+      <div id="est-outreach"></div>
+    </section>
+
+    <!-- =================== MODULE 1: LEAKAGE =================== -->
+    <section id="pane-leakage" class="pane">
+      <div class="pane-head">
+        <h2>Revenue Leakage Detector</h2>
+        <p>Cross-references the rent roll against ancillary source systems (PetScreening, parking, storage, utility/RUBS, lease abstracts) and flags every charge that is owed but not billed — with a dollar run-rate.</p>
+      </div>
+      <div id="leak-kpis" class="kpis"></div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Recoverable revenue by category</h3>
+          <div id="leak-cats" class="cats"></div>
+        </div>
+        <div class="card csv-card">
+          <h3>Run it on your own data</h3>
+          <p class="muted">Everything stays in your browser — nothing is uploaded to a server.</p>
+          <label class="filebtn">Upload reconciliation CSV
+            <input type="file" id="csv-upload" accept=".csv" hidden />
+          </label>
+          <div class="csv-links">
+            <a href="#" id="csv-template">↓ Download CSV template</a>
+            <button id="csv-reset" class="linkbtn">Reset to sample</button>
+          </div>
+          <div id="csv-status" class="csv-status muted"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Exception detail <span class="muted">(actionable, unit by unit)</span></h3>
+        <div class="tablescroll"><table id="leak-table" class="data"></table></div>
+      </div>
+    </section>
+
+    <!-- =================== MODULE 2: VARIANCE =================== -->
+    <section id="pane-variance" class="pane">
+      <div class="pane-head">
+        <h2>Variance / Board-Package Generator</h2>
+        <p>Reads budget vs. actual, flags every material variance, and auto-writes the commentary that goes into the monthly ownership / board package.</p>
+      </div>
+      <div id="var-kpis" class="kpis"></div>
+      <div id="var-summary"></div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Budget vs. actual — current month</h3>
+          <div class="tablescroll"><table id="var-table" class="data"></table></div>
+        </div>
+        <div class="card">
+          <div id="var-narrative"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================== MODULE 3: AR =================== -->
+    <section id="pane-ar" class="pane">
+      <div class="pane-head">
+        <h2>AR / Delinquency Triage</h2>
+        <p>Buckets the resident ledger by age, assigns a risk tier and the right collections action to each account, and drafts the resident notice.</p>
+      </div>
+      <div id="ar-kpis" class="kpis"></div>
+      <div class="card">
+        <h3>Aging summary</h3>
+        <div id="ar-buckets" class="buckets"></div>
+      </div>
+      <div class="card">
+        <h3>Account triage <span class="muted">(prioritized, with drafted notices)</span></h3>
+        <div class="tablescroll"><table id="ar-table" class="data"></table></div>
+        <div id="ar-draft" class="draft" style="display:none">
+          <div class="draft-tag">Auto-drafted notice — review before sending</div>
+          <pre id="ar-draft-text"></pre>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="foot">
+    <div class="wrap">
+      <p><strong>NOI Copilot</strong> — a portfolio demo. All data is fully synthetic; no real resident or property information is used.</p>
+      <p class="muted">Built by an asset-management analyst (multifamily). The first module reproduces a real reconciliation that recovered ~$60K/yr of uncaptured pet revenue across a 16-building portfolio.</p>
+    </div>
+  </footer>
+
+  <script src="assets/data.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>
