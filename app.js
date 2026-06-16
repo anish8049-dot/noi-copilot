@@ -11,9 +11,10 @@
    ============================================================================= */
 
 // ---------- formatting helpers ----------------------------------------------
-const usd  = (n) => "$" + Math.round(n).toLocaleString("en-US");
+const usd  = (n) => (n < 0 ? "-$" : "$") + Math.round(Math.abs(n)).toLocaleString("en-US");
 const usd2 = (n) => "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pct  = (n) => (n >= 0 ? "+" : "") + n.toFixed(1) + "%";
+const usdK = (n) => "$" + (Math.abs(n) >= 1000 ? Math.round(n / 1000) + "K" : Math.round(n).toString());
 
 // ============================================================================
 // MODULE 1 — Revenue Leakage Detector
@@ -104,7 +105,7 @@ function computeLeakage(rows) {
 const DRIVERS = {
   "Gross Potential Rent|unfavorable": "reflecting loss-to-lease on renewals and slower lease-up on the vacant units.",
   "Vacancy & Loss-to-Lease|unfavorable": "as units turned over mid-month and re-leased below the prior in-place rent.",
-  "Other / Ancillary Income|unfavorable": "driven by uncaptured pet, parking, storage, and utility (RUBS) charges — the Leakage Detector isolates the specific units and the recoverable run-rate.",
+  "Other / Ancillary Income|unfavorable": "driven by uncaptured pet, parking, storage, and utility (RUBS) charges. The Leakage Detector isolates the specific units and the recoverable run-rate.",
   "Payroll & Benefits|favorable": "primarily an open maintenance-technician position held vacant during the period.",
   "Repairs & Maintenance|unfavorable": "elevated emergency work orders, including an unbudgeted HVAC compressor replacement and plumbing call-outs.",
   "Turnover / Make-Ready|unfavorable": "above-plan unit turns and higher flooring and paint cost per make-ready.",
@@ -165,7 +166,7 @@ function computeVariance(data, opts = {}) {
 
 function computeAR(data) {
   const tiers = {
-    "90+ / Critical": { risk: "High",   action: "Final notice — begin lease enforcement / legal referral; place renewal on hold." },
+    "90+ / Critical": { risk: "High",   action: "Final notice. Begin lease enforcement / legal referral; place renewal on hold." },
     "60 days":        { risk: "High",   action: "Formal demand + payment-plan offer; flag account for review." },
     "30 days":        { risk: "Medium", action: "Late notice + assess late fee per lease terms." },
     "Current":        { risk: "Low",    action: "Courtesy reminder; enroll in autopay." },
@@ -203,7 +204,7 @@ function draftNotice(acct, propertyName) {
     "30 days": `Our records show a past-due balance on your account. A late fee may apply per your lease. Please remit payment at your earliest convenience.`,
     "Current": `This is a friendly reminder of a balance on your account. Enrolling in autopay helps avoid future late fees.`,
   }[acct.tier];
-  return `Re: Account balance — Unit ${acct.unit}, ${propertyName}\n\nDear ${acct.resident},\n\n${tone}\n\nCurrent balance due: ${usd2(acct.total)}\n  • 1–30 days:  ${usd2(acct.d30)}\n  • 31–60 days: ${usd2(acct.d60)}\n  • 61–90+ days: ${usd2(acct.d90)}\n\nPlease contact the management office with any questions.\n\nSincerely,\n${propertyName} Management`;
+  return `Re: Account balance, Unit ${acct.unit}, ${propertyName}\n\nDear ${acct.resident},\n\n${tone}\n\nCurrent balance due: ${usd2(acct.total)}\n  - 1 to 30 days:  ${usd2(acct.d30)}\n  - 31 to 60 days: ${usd2(acct.d60)}\n  - 61 to 90+ days: ${usd2(acct.d90)}\n\nPlease contact the management office with any questions.\n\nSincerely,\n${propertyName} Management`;
 }
 
 // ============================================================================
@@ -324,6 +325,28 @@ if (typeof document !== "undefined") {
     const confBadge = (c) => `<span class="badge ${c === "High" ? "b-high" : "b-med"}">${c}</span>`;
     const riskBadge = (r) => `<span class="badge ${r === "High" ? "b-risk" : r === "Medium" ? "b-med" : "b-low"}">${r}</span>`;
 
+    // ---- donut chart + legend (zero-dependency SVG) ----
+    const CAT_COLORS = { "Pet rent": "#10a173", "Parking": "#3b6fe0", "Storage": "#14b8a6", "RUBS / utility": "#f0a429", "Concession": "#8b5cf6", "Concessions": "#8b5cf6" };
+    const segOf = (name, value, color) => ({ label: name, value, color: color || CAT_COLORS[name] || "#8090a6" });
+    const donutSVG = (segs, centerMain, centerSub) => {
+      const total = segs.reduce((s, x) => s + x.value, 0) || 1;
+      const R = 56, C = 2 * Math.PI * R, sw = 24; let off = 0;
+      const arcs = segs.filter((s) => s.value > 0).map((s) => {
+        const len = s.value / total * C;
+        const el = `<circle r="${R}" cx="80" cy="80" fill="none" stroke="${s.color}" stroke-width="${sw}" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 80 80)"/>`;
+        off += len; return el;
+      }).join("");
+      return `<svg class="donut" viewBox="0 0 160 160" role="img" aria-label="breakdown">
+        <circle r="${R}" cx="80" cy="80" fill="none" stroke="rgba(120,140,170,.14)" stroke-width="${sw}"/>${arcs}
+        <text class="donut-c1" x="80" y="78" text-anchor="middle">${centerMain}</text>
+        <text class="donut-c2" x="80" y="96" text-anchor="middle">${centerSub}</text></svg>`;
+    };
+    const legendUL = (segs) => {
+      const total = segs.reduce((s, x) => s + x.value, 0) || 1;
+      return `<ul class="legend">` + segs.slice().sort((a, b) => b.value - a.value).map((s) =>
+        `<li><span class="dot" style="background:${s.color}"></span><span class="lg-name">${s.label}</span><span class="lg-val">${usd(s.value)}</span><span class="lg-pct">${(s.value / total * 100).toFixed(0)}%</span></li>`).join("") + `</ul>`;
+    };
+
     // header
     $("#prop-name").textContent = DATA.property.name;
     $("#prop-meta").textContent = `${DATA.property.units} units · ${DATA.property.city} · as of ${DATA.property.asOf}`;
@@ -335,13 +358,12 @@ if (typeof document !== "undefined") {
       $("#leak-kpis").innerHTML =
         kpi("Recoverable / year", usd(L.totalAnnual), `${usd(L.totalMonthly)}/mo run-rate`, "accent-green") +
         kpi("Exceptions found", L.exceptions.length, `${L.unitsAffected} units affected`) +
-        kpi("Top category", cats[0] ? cats[0][0] : "—", cats[0] ? usd(cats[0][1].annual) + "/yr" : "") +
+        kpi("Top category", cats[0] ? cats[0][0] : "None", cats[0] ? usd(cats[0][1].annual) + "/yr" : "") +
         kpi("Systems reconciled", "5", "Rent roll × ancillary sources");
 
-      $("#leak-cats").innerHTML = cats.map(([c, v]) =>
-        `<div class="catbar"><div class="catbar-top"><span>${c}</span><strong>${usd(v.annual)}/yr</strong></div>
-         <div class="catbar-track"><div class="catbar-fill" style="width:${(v.annual / L.totalAnnual * 100).toFixed(0)}%"></div></div>
-         <div class="catbar-sub">${v.count} exception${v.count > 1 ? "s" : ""}</div></div>`).join("");
+      const leakSegs = cats.map(([c, v]) => segOf(c, v.annual));
+      $("#leak-donut").innerHTML = donutSVG(leakSegs, usdK(L.totalAnnual), "per year");
+      $("#leak-legend").innerHTML = legendUL(leakSegs);
 
       $("#leak-table").innerHTML = `
         <thead><tr><th>Unit</th><th>Resident</th><th>Category</th><th>Source system</th>
@@ -356,7 +378,7 @@ if (typeof document !== "undefined") {
     function renderVariance() {
       const V = computeVariance(DATA);
       $("#var-kpis").innerHTML =
-        kpi("NOI — actual", usd(V.noiActual), "current month", V.noiVar >= 0 ? "accent-green" : "accent-red") +
+        kpi("NOI (actual)", usd(V.noiActual), "current month", V.noiVar >= 0 ? "accent-green" : "accent-red") +
         kpi("NOI vs budget", usd(V.noiVar), pct(V.noiPct), V.noiVar >= 0 ? "accent-green" : "accent-red") +
         kpi("Total revenue", usd(V.revActual), `budget ${usd(V.revBudget)}`) +
         kpi("Total opex", usd(V.opexActual), `budget ${usd(V.opexBudget)}`);
@@ -370,9 +392,9 @@ if (typeof document !== "undefined") {
         <tbody>${V.lines.map((l) => `
           <tr class="${l.material ? "" : "dim"}"><td>${l.glLine}</td>
           <td class="num">${usd(l.budget)}</td><td class="num">${usd(l.actual)}</td>
-          <td class="num ${l.favorable ? "pos" : "neg"}">${(l.actual - l.budget) >= 0 ? "+" : "−"}${usd(l.absVar)}</td>
+          <td class="num ${l.favorable ? "pos" : "neg"}">${(l.actual - l.budget) >= 0 ? "+" : "-"}${usd(l.absVar)}</td>
           <td class="num ${l.favorable ? "pos" : "neg"}">${pct(l.pctVar)}</td>
-          <td>${l.material ? (l.favorable ? '<span class="badge b-low">Favorable</span>' : '<span class="badge b-risk">Unfavorable</span>') : '<span class="muted">—</span>'}</td></tr>`).join("")}</tbody>`;
+          <td>${l.material ? (l.favorable ? '<span class="badge b-low">Favorable</span>' : '<span class="badge b-risk">Unfavorable</span>') : '<span class="muted">Immaterial</span>'}</td></tr>`).join("")}</tbody>`;
 
       $("#var-narrative").innerHTML = `<h4>Variance commentary <span class="muted">(board-package ready)</span></h4>` +
         `<ul class="narrative">${V.lines.filter((l) => l.material)
@@ -390,10 +412,17 @@ if (typeof document !== "undefined") {
         kpi("90+ critical", usd(A.buckets.d90), "needs escalation", "accent-red");
 
       $("#ar-buckets").innerHTML = [
-        ["Current", A.buckets.current, "b-low"], ["1–30 days", A.buckets.d30, "b-med"],
-        ["31–60 days", A.buckets.d60, "b-risk"], ["61–90+ days", A.buckets.d90, "b-risk"],
+        ["Current", A.buckets.current, "b-low"], ["1 to 30 days", A.buckets.d30, "b-med"],
+        ["31 to 60 days", A.buckets.d60, "b-risk"], ["61 to 90+ days", A.buckets.d90, "b-risk"],
       ].map(([lbl, val, cls]) =>
         `<div class="bucket"><div class="bucket-val">${usd(val)}</div><div class="bucket-lbl"><span class="badge ${cls}">${lbl}</span></div></div>`).join("");
+
+      const arSegs = [
+        segOf("Current", A.buckets.current, "#10a173"), segOf("1 to 30 days", A.buckets.d30, "#f0a429"),
+        segOf("31 to 60 days", A.buckets.d60, "#db4961"), segOf("61 to 90+ days", A.buckets.d90, "#8a2436"),
+      ];
+      $("#ar-donut").innerHTML = donutSVG(arSegs, usdK(A.totalAR), "total AR");
+      $("#ar-legend").innerHTML = legendUL(arSegs);
 
       $("#ar-table").innerHTML = `
         <thead><tr><th>Unit</th><th>Resident</th><th>Tier</th><th>Risk</th>
@@ -441,7 +470,7 @@ if (typeof document !== "undefined") {
         try {
           reconRows = csvToRows(fr.result);
           renderLeakage();
-          $("#csv-status").textContent = `Loaded ${reconRows.length} units from ${file.name} — detector re-run.`;
+          $("#csv-status").textContent = `Loaded ${reconRows.length} units from ${file.name}. Detector re-run.`;
         } catch (err) {
           $("#csv-status").textContent = "Could not parse that CSV. Use the template format.";
         }
@@ -463,7 +492,7 @@ if (typeof document !== "undefined") {
       const o = document.createElement("option"); o.value = k; o.textContent = k;
       if (k.startsWith("Sunbelt")) o.selected = true; $("#est-market").appendChild(o);
     });
-    const fpct = (n) => n == null ? '<span class="muted">—</span>' : (n * 100).toFixed(n < 0.1 ? 1 : 0) + "%";
+    const fpct = (n) => n == null ? '<span class="muted">n/a</span>' : (n * 100).toFixed(n < 0.1 ? 1 : 0) + "%";
 
     function renderEstimator() {
       const matV = +$("#est-maturity").value;
@@ -472,13 +501,12 @@ if (typeof document !== "undefined") {
       const E = computeEstimate({ units, assetClass: $("#est-class").value, market: $("#est-market").value, maturity: matV });
 
       $("#est-headline").innerHTML =
-        `<div class="est-range">${usd(E.low)} – ${usd(E.high)}<span class="est-yr"> / yr recoverable</span></div>
-         <div class="est-mid">midpoint ≈ <strong>${usd(E.total)}</strong> · ${usd(E.perUnit)}/unit/yr · ${E.pctEGI.toFixed(2)}% of EGI</div>`;
+        `<div class="est-range">${usd(E.low)} to ${usd(E.high)}<span class="est-yr"> / yr recoverable</span></div>
+         <div class="est-mid">midpoint about <strong>${usd(E.total)}</strong> · ${usd(E.perUnit)}/unit/yr · ${E.pctEGI.toFixed(2)}% of EGI</div>`;
 
-      const maxA = Math.max(...E.categories.map((c) => c.annual), 1);
-      $("#est-bars").innerHTML = E.categories.slice().sort((a, b) => b.annual - a.annual).map((c) =>
-        `<div class="catbar"><div class="catbar-top"><span>${c.name}</span><strong>${usd(c.annual)}/yr</strong></div>
-         <div class="catbar-track"><div class="catbar-fill" style="width:${(c.annual / maxA * 100).toFixed(0)}%"></div></div></div>`).join("");
+      const estSegs = E.categories.map((c) => segOf(c.name, c.annual));
+      $("#est-donut").innerHTML = donutSVG(estSegs, usdK(E.total), "midpoint/yr");
+      $("#est-legend").innerHTML = legendUL(estSegs);
 
       $("#est-table").innerHTML = `
         <thead><tr><th>Category</th><th>Driver</th><th class="num">Penetration</th><th class="num">Avg rate</th><th class="num">Leakage rate</th><th class="num">Est. $/yr</th></tr></thead>
@@ -486,12 +514,8 @@ if (typeof document !== "undefined") {
           <td class="num">${fpct(c.penetration)}</td><td class="num">${usd(c.rate)}${c.name.startsWith("RUBS") ? "/unit" : "/mo"}</td>
           <td class="num">${fpct(c.leakRate)}</td><td class="num strong">${usd(c.annual)}</td></tr>`).join("")}
           <tr class="totalrow"><td colspan="5" class="strong">Estimated annual recoverable</td><td class="num strong">${usd(E.total)}</td></tr></tbody>`;
-
-      const who = $("#est-name").value.trim() || "your";
-      $("#est-outreach").innerHTML = `<div class="summary-card"><div class="summary-tag">Outreach line — copy/paste</div>
-        <p>A ${units.toLocaleString()}-unit ${$("#est-class").value.replace(/ \(.*\)/, "")} portfolio in ${$("#est-market").value} is likely leaving <strong>${usd(E.low)}–${usd(E.high)}/yr</strong> (~${usd(E.perUnit)}/unit) in uncaptured ancillary revenue. I built a tool that pinpoints exactly which units and charges — happy to run it on ${who === "your" ? "your" : who + "'s"} actuals. Worth 15 minutes?</p></div>`;
     }
-    [["est-units", "input"], ["est-class", "change"], ["est-market", "change"], ["est-maturity", "input"], ["est-name", "input"]]
+    [["est-units", "input"], ["est-class", "change"], ["est-market", "change"], ["est-maturity", "input"]]
       .forEach(([id, ev]) => $("#" + id).addEventListener(ev, renderEstimator));
 
     renderEstimator();
