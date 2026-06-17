@@ -1,10 +1,10 @@
 /* =============================================================================
-   NOI Copilot ‚Äî application logic
+   NOI Copilot — application logic
    -----------------------------------------------------------------------------
    Three modules, one shared synthetic dataset (assets/data.js):
-     1. Revenue Leakage Detector  ‚Äî cross-references billed vs. owed, unit by unit
-     2. Variance / Board-Package  ‚Äî budget vs. actual + auto-written commentary
-     3. AR / Delinquency Triage   ‚Äî aging buckets, risk tiers, drafted notices
+     1. Revenue Leakage Detector  — cross-references billed vs. owed, unit by unit
+     2. Variance / Board-Package  — budget vs. actual + auto-written commentary
+     3. AR / Delinquency Triage   — aging buckets, risk tiers, drafted notices
 
    Pure compute functions are exported for Node so the math can be unit-tested
    (see test.mjs). DOM rendering only runs in the browser.
@@ -17,11 +17,11 @@ const pct  = (n) => (n >= 0 ? "+" : "") + n.toFixed(1) + "%";
 const usdK = (n) => "$" + (Math.abs(n) >= 1000 ? Math.round(n / 1000) + "K" : Math.round(n).toString());
 
 // ============================================================================
-// MODULE 1 ‚Äî Revenue Leakage Detector
+// MODULE 1 — Revenue Leakage Detector
 // ============================================================================
 
 // Flatten the structured dataset into one reconciliation row per unit. This is
-// the single source of truth the detector consumes ‚Äî the sample data and any
+// the single source of truth the detector consumes — the sample data and any
 // uploaded CSV both become rows of this shape, so there is ONE code path.
 function buildReconRows(data) {
   const reg  = Object.fromEntries(data.petRegistry.map((p) => [p.unit, p]));
@@ -99,7 +99,7 @@ function computeLeakage(rows) {
 }
 
 // ============================================================================
-// MODULE 2 ‚Äî Variance / Board-Package Generator
+// MODULE 2 — Variance / Board-Package Generator
 // ============================================================================
 
 const DRIVERS = {
@@ -161,7 +161,7 @@ function computeVariance(data, opts = {}) {
 }
 
 // ============================================================================
-// MODULE 3 ‚Äî AR / Delinquency Triage
+// MODULE 3 — AR / Delinquency Triage
 // ============================================================================
 
 function computeAR(data) {
@@ -208,7 +208,7 @@ function draftNotice(acct, propertyName) {
 }
 
 // ============================================================================
-// FIRM ESTIMATOR ‚Äî size likely leakage from portfolio characteristics
+// FIRM ESTIMATOR — size likely leakage from portfolio characteristics
 // -----------------------------------------------------------------------------
 // A benchmark sizing model (NOT the unit-level detector). Given a target firm's
 // units / asset class / market, it projects probable uncaptured ancillary
@@ -237,8 +237,8 @@ function computeEstimate(p) {
   const c = CLASSES[p.assetClass] || CLASSES["Class B (workforce)"];
   const units = Math.max(0, Math.round(p.units || 0));
   const maturity = Math.min(1, Math.max(0, (p.maturity ?? 50) / 100));
-  const matMult = 1.6 - 1.2 * maturity;       // 1.6 (no program) ‚Üí 0.4 (best-in-class)
-  const leakMult = c.opsLeak * matMult;        // ops sophistication √ó program maturity
+  const matMult = 1.6 - 1.2 * maturity;       // 1.6 (no program) → 0.4 (best-in-class)
+  const leakMult = c.opsLeak * matMult;        // ops sophistication × program maturity
   const avgRent = Math.round(m.avgRent * c.rentMult);
 
   const row = (name, driver, penetration, rate, leakRate, annual) =>
@@ -276,7 +276,7 @@ function maturityLabel(v) {
 }
 
 // ============================================================================
-// CSV helpers (upload your own rent roll ‚Üí re-run the Leakage Detector)
+// CSV helpers (upload your own rent roll → re-run the Leakage Detector)
 // ============================================================================
 const RECON_COLS = ["unit","status","pet_expected","pet_billed","parking_rate","parking_billed",
   "storage_rate","storage_billed","concession_recoverable","rubs_allocated","rubs_billed"];
@@ -349,7 +349,7 @@ if (typeof document !== "undefined") {
 
     // header
     $("#prop-name").textContent = DATA.property.name;
-    $("#prop-meta").textContent = `${DATA.property.units} units ¬∑ ${DATA.property.city} ¬∑ as of ${DATA.property.asOf}`;
+    $("#prop-meta").textContent = `${DATA.property.units} units · ${DATA.property.city} · as of ${DATA.property.asOf}`;
 
     // ---------------------------------------------------------------- Leakage
     function renderLeakage() {
@@ -359,7 +359,7 @@ if (typeof document !== "undefined") {
         kpi("Recoverable / year", usd(L.totalAnnual), `${usd(L.totalMonthly)}/mo run-rate`, "accent-green") +
         kpi("Exceptions found", L.exceptions.length, `${L.unitsAffected} units affected`) +
         kpi("Top category", cats[0] ? cats[0][0] : "None", cats[0] ? usd(cats[0][1].annual) + "/yr" : "") +
-        kpi("Systems reconciled", "5", "Rent roll √ó ancillary sources");
+        kpi("Systems reconciled", "5", "Rent roll × ancillary sources");
 
       const leakSegs = cats.map(([c, v]) => segOf(c, v.annual));
       $("#leak-donut").innerHTML = donutSVG(leakSegs, usdK(L.totalAnnual), "per year");
@@ -502,7 +502,7 @@ if (typeof document !== "undefined") {
 
       $("#est-headline").innerHTML =
         `<div class="est-range">${usd(E.low)} to ${usd(E.high)}<span class="est-yr"> / yr recoverable</span></div>
-         <div class="est-mid">midpoint about <strong>${usd(E.total)}</strong> ¬∑ ${usd(E.perUnit)}/unit/yr ¬∑ ${E.pctEGI.toFixed(2)}% of EGI</div>`;
+         <div class="est-mid">midpoint about <strong>${usd(E.total)}</strong> · ${usd(E.perUnit)}/unit/yr · ${E.pctEGI.toFixed(2)}% of EGI</div>`;
 
       const estSegs = E.categories.map((c) => segOf(c.name, c.annual));
       $("#est-donut").innerHTML = donutSVG(estSegs, usdK(E.total), "midpoint/yr");
